@@ -161,33 +161,34 @@ async def fetch_and_store_prices():
         raise HTTPException(status_code=500, detail="Baza podataka nije povezana.")
 
     try:
-        # 1. Povlačenje podataka sa yfinance (uzimamo zadnji dan sa intervalom od 15m)
         ticker_symbols = list(TICKERS.keys())
+        # Povlačenje podataka sa yfinance (skupni zahtev za sve tikere)
         data = yf.download(ticker_symbols, period="1d", interval="15m")
 
         if data.empty:
             raise HTTPException(status_code=400, detail="Nije moguće povući podatke sa Yahoo Finance.")
 
         records_to_insert = []
+        inserted_preview = {}
         
-        # 2. Parsiranje podataka iz Pandas DataFrame-a
         for ticker in ticker_symbols:
             try:
-                # Uzimamo poslednju dostupnu cenu zatvaranja (Close)
-                latest_price = data['Close'][ticker].dropna().iloc[-1]
-                records_to_insert.append((ticker, float(latest_price)))
+                # Bezbedno izvlačenje Close cene iz MultiIndex DataFrame-a
+                if 'Close' in data.columns:
+                    if ticker in data['Close'].columns:
+                        series = data['Close'][ticker].dropna()
+                        if not series.empty:
+                            latest_price = float(series.iloc[-1])
+                            records_to_insert.append((ticker, latest_price))
+                            inserted_preview[TICKERS[ticker]["name"]] = latest_price
             except Exception:
-                # Preskačemo tiker ako trenutno nema podataka (npr. vikend ili zatvoreno tržište)
                 continue
 
         if not records_to_insert:
-            return {"message": "Tržišta su verovatno zatvorena, nema novih podataka."}
+            return {"message": "Tržišta su zatvorena ili nema novih podataka."}
 
-        # 3. Upis u bazu preko ČISTOG SQL-a pomoću asyncpg executemany (masovni brz upis)
-        query = """
-            INSERT INTO market_data (ticker, price_close)
-            VALUES ($1, $2);
-        """
+        # Masovni upis u bazu preko asyncpg
+        query = "INSERT INTO market_data (ticker, price_close) VALUES ($1, $2);"
         
         async with db.pool.acquire() as connection:
             await connection.executemany(query, records_to_insert)
@@ -195,7 +196,7 @@ async def fetch_and_store_prices():
         return {
             "status": "success",
             "inserted_records": len(records_to_insert),
-            "data": {TICKERS[t]: p for t, p in records_to_insert}
+            "data": inserted_preview
         }
 
     except Exception as e:
@@ -204,8 +205,11 @@ async def fetch_and_store_prices():
 @router.get("/latest")
 async def get_latest_prices():
     """
-    Vraća poslednje zabeležene cene iz baze za sve tikere.
+    Vraća poslednje zabeležene cene iz baze za sve tikere sa pratećim sektorima.
     """
+    if not db.pool:
+        raise HTTPException(status_code=500, detail="Baza podataka nije povezana.")
+
     query = """
         SELECT DISTINCT ON (ticker) ticker, price_close, timestamp
         FROM market_data
@@ -217,7 +221,8 @@ async def get_latest_prices():
     return [
         {
             "ticker": row["ticker"],
-            "name": TICKERS.get(row["ticker"], "Unknown"),
+            "name": TICKERS.get(row["ticker"], {}).get("name", "Unknown"),
+            "sector": TICKERS.get(row["ticker"], {}).get("sector", "Unknown"),
             "price": float(row["price_close"]),
             "timestamp": row["timestamp"]
         }
