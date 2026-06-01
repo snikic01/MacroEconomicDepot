@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 from app.database import db
+import requests
 
 router = APIRouter(prefix="/market", tags=["Market Data"])
 
@@ -228,3 +229,41 @@ async def get_latest_prices():
         }
         for row in rows
     ]
+
+@router.post("/fetch-fear-greed")
+async def fetch_and_store_fear_greed():
+    """
+    Povlači trenutni Fear & Greed Index i upisuje ga u PostgreSQL kroz čist SQL.
+    """
+    if not db.pool:
+        raise HTTPException(status_code=500, detail="Baza podataka nije povezana.")
+
+    url = "https://alternative.me"
+    
+    try:
+        response = requests.get(url).json()
+        
+        if "data" in response and len(response["data"]) > 0:
+            latest_data = response["data"][0]
+            
+            value = int(latest_data["value"])
+            sentiment = latest_data["value_classification"] # Extreme Fear, Greed...
+            
+            # Upis u tabelu fear_greed_index preko SQL-a
+            query = """
+                INSERT INTO fear_greed_index (index_value, sentiment)
+                VALUES ($1, $2);
+            """
+            async with db.pool.acquire() as connection:
+                await connection.execute(query, value, sentiment)
+                
+            return {
+                "status": "success",
+                "value": value,
+                "sentiment": sentiment
+            }
+        else:
+            raise HTTPException(status_code=400, detail="API nije vratio validne podatke.")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Greška pri povlačenju Fear & Greed indeksa: {str(e)}")
