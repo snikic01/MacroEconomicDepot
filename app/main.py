@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import db
-from app.routers import market
+from app.routers import market, economics
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,6 +13,7 @@ app = FastAPI(title="MEDepot API Dashboard", lifespan=lifespan)
 
 # Registracija rutera za finansijske podatke
 app.include_router(market.router)
+app.include_router(economics.router)
 
 @app.get("/")
 async def root():
