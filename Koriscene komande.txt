@@ -1,1 +1,3 @@
 1. pip install -r requirements.txt ---> Instalacija potrebnih biblioteka
+
+2. uvicorn app.main:app --reload ---> Prvi test run!
