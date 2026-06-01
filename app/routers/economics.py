@@ -2,6 +2,13 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings
 # Uvoz servisa
 from app.services import fed, ecb, nbs
+from pydantic import BaseModel
+from datetime import date
+
+class MacroIndicator(BaseModel):
+    indicator_name: str     # Npr. "Unemployment", "PCE Inflation", "Fed Funds Rate"
+    value: float            # Vrednost (4.3, 3.77, 3.62)
+    as_of_date: date        # Datum važenja podataka
 
 router = APIRouter(prefix="/economics", tags=["Economics & Central Banks"])
 

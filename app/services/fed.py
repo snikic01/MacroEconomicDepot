@@ -18,7 +18,6 @@ async def fetch_fed_rate_history(days: int):
                     if obs["value"] == ".": 
                         continue
                     obs_date = datetime.strptime(obs["date"], "%Y-%m-%d")
-                    # Osiguravamo se da konverzija u float neće srušiti petlju
                     rate_value = float(obs["value"])
                     records.append(('FED', 'Federal Reserve (USA)', rate_value, obs_date))
                 except (ValueError, KeyError):
@@ -50,7 +49,6 @@ async def fetch_yield_curve_history(days: int):
                         if obs["value"] == ".": 
                             continue
                         obs_date = datetime.strptime(obs["date"], "%Y-%m-%d")
-                        # KRIZNA TAČKA: Osiguravamo konverziju prinosa u float
                         yield_value = float(obs["value"])
                         records.append((duration, yield_value, obs_date))
                     except (ValueError, KeyError):
