@@ -96,13 +96,13 @@ async def generate_macro_report():
         # 7. Pozivanje Google GenAI SDK klijenta
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
         )
 
         return {
             "status": "success",
-            "model_used": "gemini-1.5-flash",
+            "model_used": "gemini-2.5-flash",
             "report": response.text
         }
 
