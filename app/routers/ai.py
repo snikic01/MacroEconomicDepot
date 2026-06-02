@@ -31,9 +31,11 @@ async def generate_macro_report():
         
         # 2. Povlačenje najnovijeg stanja američke krive prinosa
         yield_query = """
-            SELECT DISTINCT ON (duration) duration, yield_rate 
+            SELECT duration, yield_rate 
             FROM yield_curve 
-            ORDER BY duration, timestamp DESC;
+            WHERE id IN (
+                SELECT MAX(id) FROM yield_curve GROUP BY duration
+            );
         """
         
         # 3. Povlačenje trenutnih kamatnih stopa centralnih banaka
